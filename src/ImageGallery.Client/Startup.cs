@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Net.Http.Headers;
 using System;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace ImageGallery.Client
 {
@@ -17,7 +19,8 @@ namespace ImageGallery.Client
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
-        }
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear(); //keeping the original claims.
+        } 
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
@@ -32,6 +35,13 @@ namespace ImageGallery.Client
                 client.DefaultRequestHeaders.Clear();
                 client.DefaultRequestHeaders.Add(HeaderNames.Accept, "application/json");
             });
+            // create an HttpClient used for accessing the idp
+            services.AddHttpClient("IDPClient", client =>
+            {
+                client.BaseAddress = new Uri("https://localhost:44318/");
+                client.DefaultRequestHeaders.Clear();
+                client.DefaultRequestHeaders.Add(HeaderNames.Accept, "application/json");
+            });
 
             services.AddAuthentication(optins =>
             {
@@ -42,16 +52,27 @@ namespace ImageGallery.Client
                .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
                 {
                     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                    options.Authority = "https://localhost:44318/";
+                    options.Authority = "https://localhost:44318/";//identity server local host
                     options.ClientId = "imagegallaryclient";
                     options.ResponseType = "code";
-                  //options.UsePkce = false;
-                 //options.CallbackPath = new Microsoft.AspNetCore.Http.PathString("...");
-                 //options.SignedOutCallbackPath=new Microsoft.AspNetCore.Http.PathString("...")default signout-callback-oidc
-                   options.Scope.Add("openid");
-                    options.Scope.Add("profile");
+                    //options.UsePkce = false;
+                    //options.CallbackPath = new Microsoft.AspNetCore.Http.PathString("..."); default singin-oidc
+                    //options.SignedOutCallbackPath=new Microsoft.AspNetCore.Http.PathString("...")default signout-callback-oidc
+                    //options.Scope.Add("openid");//opinid and profie added by defaul
+                    //options.Scope.Add("profile");
+                    options.Scope.Add("address");
+
+                    //options.ClaimActions.Remove("nbf");//remove filter that prevent nbf to get.
+                    //delete claims 
+
+                    options.ClaimActions.DeleteClaim("sid");
+                    options.ClaimActions.DeleteClaim("s_hash");
+                    options.ClaimActions.DeleteClaim("idp");
+                    options.ClaimActions.DeleteClaim("auth_time");
+
                     options.SaveTokens = true;
                     options.ClientSecret = "secret";
+                    options.GetClaimsFromUserInfoEndpoint = true;
                 });
 
         }
@@ -60,7 +81,7 @@ namespace ImageGallery.Client
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             app.UseStaticFiles();
- 
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();

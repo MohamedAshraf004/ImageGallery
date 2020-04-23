@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,14 +42,18 @@ namespace ImageGallery.Client.Controllers
             
             var response = await httpClient.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-
-            response.EnsureSuccessStatusCode();
-
-            using (var responseStream = await response.Content.ReadAsStreamAsync())
-            {   
-                return View(new GalleryIndexViewModel(
-                    await JsonSerializer.DeserializeAsync<List<Image>>(responseStream)));
-            }             
+            if (response.IsSuccessStatusCode)
+            {
+                using(var responseStream=await response.Content.ReadAsStreamAsync())
+                {
+                    return View(new GalleryIndexViewModel(await JsonSerializer.DeserializeAsync<List<Image>>(responseStream)));
+                }
+            }else if(response.StatusCode==HttpStatusCode.Unauthorized||
+                        response.StatusCode== HttpStatusCode.Forbidden)
+            {
+                return RedirectToAction("AccessDeined", "Authorization");
+            }
+            throw new Exception("Problem in accesing API");
         }
 
         public async Task<IActionResult> EditImage(Guid id)

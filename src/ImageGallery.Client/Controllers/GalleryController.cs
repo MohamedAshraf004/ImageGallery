@@ -187,7 +187,8 @@ namespace ImageGallery.Client.Controllers
 
             return RedirectToAction("Index");
         }
-        [Authorize(Roles ="PayingUser")]
+        //[Authorize(Roles ="PayingUser")]
+        [Authorize(Policy = "CanOrderFrame")]
         public async Task<IActionResult> OrderFrame()
         {
             var idpClient = _httpClientFactory.CreateClient("IDPClient");
